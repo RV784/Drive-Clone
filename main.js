@@ -2,35 +2,39 @@
     let btnAddFolder = document.querySelector("#addFolder");
     let btnAddTextFile = document.querySelector("#addTextFile");
     let divbreadcrumb = document.querySelector("#breadcrumb");
+    let aRootPath = divbreadcrumb.querySelector("a[purpose='path']");
     let divContainer = document.querySelector("#container");
     let templates = document.querySelector("#templates");
     let resources = [];
-    let cfid = -1; //initially in which folder we are...id -1
+    let cfid = -1; // initially we are at root (which has an id of -1)
     let rid = 0;
 
     btnAddFolder.addEventListener("click", addFolder);
     btnAddTextFile.addEventListener("click", addTextFile);
+    aRootPath.addEventListener("click", viewFolderFromPath);
 
+    // validation - unique, non-blank
     function addFolder(){
         let rname = prompt("Enter folder's name");
-        if(rname != numm){
+        if(rname != null){
             rname = rname.trim();
         }
-        if(!rname){  //empty name validation
-            alert("empty name!");
+
+        if(!rname){ // empty name validation
+            alert("Empty name is not allowed.");
             return;
         }
 
-        //validation for uniqueness
+        // uniqueness validation
         let alreadyExists = resources.some(r => r.rname == rname && r.pid == cfid);
         if(alreadyExists == true){
-            alert(rname + " is already in use, Try some other name");
+            alert(rname + " is already in use. Try some other name");
             return;
         }
-        let rid = resources.length;
-        let pid = cfid;
-        addFolderHTML(rname, rid, cfid);
 
+        let pid = cfid;
+        rid++;
+        addFolderHTML(rname, rid, pid);
         resources.push({
             rid: rid,
             rname: rname,
@@ -53,13 +57,15 @@
 
     }
 
+    // empty, old, unique
     function renameFolder(){
         let nrname = prompt("Enter folder's name");
         if(nrname != null){
             nrname = nrname.trim();
         }
-        if(!nrname){  //empty name validation
-            alert("empty name!");
+
+        if(!nrname){ // empty name validation
+            alert("Empty name is not allowed.");
             return;
         }
 
@@ -67,29 +73,25 @@
         let divFolder = spanRename.parentNode;
         let divName = divFolder.querySelector("[purpose=name]");
         let orname = divName.innerHTML;
-        let ridTBE = parseInt(divFolder.getAttribute("rid"));
+        let ridTBU = parseInt(divFolder.getAttribute("rid"));
         if(nrname == orname){
             alert("Please enter a new name.");
             return;
         }
 
-
         let alreadyExists = resources.some(r => r.rname == nrname && r.pid == cfid);
         if(alreadyExists == true){
-            alert(nrname + " name already in use");
+            alert(nrname + " already exists.");
             return;
         }
 
-
-        //change html
+        // change html
         divName.innerHTML = nrname;
-        //change ram
-        let ridx = resources.find(r => r.rid == ridTBE);
-        resources.rname = nrname;
-
-        //change storage
+        // change ram
+        let resource = resources.find(r => r.rid == ridTBU);
+        resource.rname = nrname;
+        // change storage
         saveToStorage();
-       
     }
 
     function renameTextFile(){
@@ -97,8 +99,48 @@
     }
 
     function viewFolder(){
-        console.log("In view");
+        let spanView = this;
+        let divFolder = spanView.parentNode;
+        let divName = divFolder.querySelector("[purpose = 'name']");
 
+        let fname = divName.innerHTML;
+        let fid = parseInt(divFolder.getAttribute("rid"));
+
+        let aPathTemplate = templates.content.querySelector("a[purpose ='path']");
+        let aPath = document.importNode(aPathTemplate, true);
+
+        aPath.innerHTML = fname;
+        aPath.setAttribute("rid", fid);
+        aPath.addEventListener("click", viewFolderFromPath);
+        divbreadcrumb.appendChild(aPath);
+
+        cfid = fid;
+        divContainer.innerHTML = "";
+        for(let i = 0 ; i < resources.length; i++){
+            if(resources[i].pid == cfid){
+                addFolderHTML(resources[i].rname, resources[i].rid, resources[i].pid);
+            }
+        }
+    }
+
+    function viewFolderFromPath(){
+        let aPath = this;
+        let fid = parseInt(aPath.getAttribute("rid"));
+
+        //set the breadcrumb
+        while(aPath.nextSibling){
+            aPath.parentNode.removeChile(aPath.nextSibling);
+        }
+
+        //set the container
+        cfid = fid;
+        divContainer.innerHTML = "";
+        for(let i = 0 ; i < resources.length ; i++){
+            if(resources[i].pid == cfid){
+                addFolderHTML(resources[i].rname, resources[i].rid, resources[i].pid);
+
+            }
+        }
     }
 
     function viewTextFile(){
@@ -107,243 +149,48 @@
 
     function addFolderHTML(rname, rid, pid){
         let divFolderTemplate = templates.content.querySelector(".folder");
-        let divFolder = document.importNode(divFolderTemplate, true);
+        let divFolder = document.importNode(divFolderTemplate, true); // makes a copy
 
         let spanRename = divFolder.querySelector("[action=rename]");
         let spanDelete = divFolder.querySelector("[action=delete]");
         let spanView = divFolder.querySelector("[action=view]");
+        let divName = divFolder.querySelector("[purpose=name]");
 
         spanRename.addEventListener("click", renameFolder);
         spanDelete.addEventListener("click", deleteFolder);
         spanView.addEventListener("click", viewFolder);
-
-        let divName = divFolder.querySelector("[purpose=name]");
         divName.innerHTML = rname;
         divFolder.setAttribute("rid", rid);
         divFolder.setAttribute("pid", pid);
 
         divContainer.appendChild(divFolder);
-
     }
 
     function saveToStorage(){
-        let rjson = JSON.stringify(resources); //convert jso to string json which can be saved in local storage
+        let rjson = JSON.stringify(resources); // used to convert jso to a json string which can be saved
         localStorage.setItem("data", rjson);
-
     }
 
     function loadFromStorage(){
         let rjson = localStorage.getItem("data");
+        if(!rjson){
+            return;
+        }
+       
         resources = JSON.parse(rjson);
-        if(!!rjson){
-        for(let i = 0 ; i < resources.length ; i++){
+        for(let i = 0; i < resources.length; i++){
             if(resources[i].pid == cfid){
                 addFolderHTML(resources[i].rname, resources[i].rid, resources[i].pid);
             }
 
             if(resources[i].rid > rid){
-                rid = resources[i].rid
+                rid = resources[i].rid;
             }
         }
     }
-    }
 
     loadFromStorage();
-
 })();
+// to prevent namespace pollution
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// (function () {
-//     let btnAddFolder = document.querySelector("#btnAddFolder");
-//     let divBreadCrumb = document.querySelector("#divBreadCrumb");
-//     let aRootPath = document.querySelector(".path");
-//     let divContainer = document.querySelector("#divContainer");
-//     let pageTemplates = document.querySelector("#pageTemplates");
-//     let folders = [];
-//     let cfid = -1; // id of the folder in which we are
-//     let fid = -1;
-
-//     btnAddFolder.addEventListener("click", addFolder);
-//     aRootPath.addEventListener("click", navigateBreadcrumb);
-
-//     function addFolder() {
-//         let fname = prompt("Enter folder's name");
-//         if (!!fname) {
-//             let exists = folders.some(f => f.name == fname);
-//             if (exists == false) {
-//                 fid++;
-//                 folders.push({
-//                     id: fid,
-//                     name: fname,
-//                     pid: cfid
-//                 });
-//                 addFolderHTML(fname, fid, cfid);
-//                 saveToStorage();
-//             } else {
-//                 alert(fname + " already exists");
-//             }
-//         } else {
-//             alert("Please enter a name");
-//         }
-//     }
-
-//     function editFolder() {
-//         let divFolder = this.parentNode;
-//         let divName = divFolder.querySelector("[purpose='name']");
-//         let ofname = divName.innerHTML;
-
-//         let nfname = prompt("Enter new name for " + ofname);
-//         if (!!nfname) {
-//             if (nfname != ofname) {
-//                 let exists = folders.filter(f => f.pid == cfid).some(f => f.name == nfname);
-//                 if (exists == false) {
-//                    // ram
-//                    let folder = folders.filter(f => f.pid == cfid).find(f => f.name == ofname);
-//                    folder.name = nfname;
-
-//                    // html
-//                    divName.innerHTML = nfname;
-
-//                    // storage
-//                    saveToStorage();
-//                 } else {
-//                     alert(nfname + " already exists");
-//                 }
-//             } else {
-//                 alert("This is the old name only. Please enter something new.");
-//             }
-//         } else {
-//             alert("Please enter a name");
-//         }
-//     }
-
-//     function deleteFolder() {
-//         let divFolder = this.parentNode;
-//         let divName = divFolder.querySelector("[purpose='name']");
-//         let fidtbd = divFolder.getAttribute("fid");
-
-//         let flag = confirm("Are you sure you want to delete " + divName.innerHTML + "?");
-//         if (flag == true) {
-//             let exists = folders.some(f => f.pid == fidtbd);
-//             if(exists == false){
-//                 // ram
-//                 let fidx = folders.findIndex(f => f.id == fidtbd);
-//                 folders.splice(fidx, 1);
-
-//                 // html
-//                 divContainer.removeChild(divFolder);
-
-//                 // storage
-//                 saveToStorage();
-//             } else {
-//                 alert("Can't delete. Has children.");
-//             }
-//         }
-//     }
-
-//     //
-//     function navigateBreadcrumb(){
-//         let fname = this.innerHTML;
-//         cfid = parseInt(this.getAttribute("fid"));
- 
-//         divContainer.innerHTML = "";
-//         folders.filter(f => f.pid == cfid).forEach(f => {
-//             addFolderHTML(f.name, f.id, f.pid);
-//         });
-
-//         while(this.nextSibling){
-//             this.parentNode.removeChild(this.nextSibling);
-//         }
-//     }
-
-//     // 10:40 to 10:55
-//     function viewFolder(){
-//         let divFolder = this.parentNode;
-//         let divName = divFolder.querySelector("[purpose='name']");
-//         cfid = parseInt(divFolder.getAttribute("fid"));
-
-//         let aPathTemplate = pageTemplates.content.querySelector(".path");
-//         let aPath = document.importNode(aPathTemplate, true);
-
-//         aPath.innerHTML = divName.innerHTML;
-//         aPath.setAttribute("fid", cfid);
-//         aPath.addEventListener("click", navigateBreadcrumb);
-//         divBreadCrumb.appendChild(aPath);
-
-//         divContainer.innerHTML = "";
-//         folders.filter(f => f.pid == cfid).forEach(f => {
-//             addFolderHTML(f.name, f.id, f.pid);
-//         });
-//     }
-
-//     function addFolderHTML(fname, fid, pid) {
-//         let divFolderTemplate = pageTemplates.content.querySelector(".folder");
-//         let divFolder = document.importNode(divFolderTemplate, true);
-
-//         let divName = divFolder.querySelector("[purpose='name']");
-//         let spanEdit = divFolder.querySelector("[action='edit']");
-//         let spanDelete = divFolder.querySelector("[action='delete']");
-//         let spanView = divFolder.querySelector("[action='view']");
-
-//         divFolder.setAttribute("fid", fid);
-//         divFolder.setAttribute("pid", pid);
-//         divName.innerHTML = fname;
-//         spanEdit.addEventListener("click", editFolder);
-//         spanDelete.addEventListener("click", deleteFolder);
-//         spanView.addEventListener("click", viewFolder);
-
-//         divContainer.appendChild(divFolder);
-//     }
-
-//     function saveToStorage() {
-//         let fjson = JSON.stringify(folders);
-//         localStorage.setItem("data", fjson);
-//     }
-
-//     function loadFromStorage() {
-//         let fjson = localStorage.getItem("data");
-//         if (!!fjson) {
-//             folders = JSON.parse(fjson);
-//             folders.forEach(f => {
-//                 if (f.id > fid) {
-//                     fid = f.id;
-//                 }
-
-//                 if(f.pid === cfid){
-//                     addFolderHTML(f.name, f.id, cfid);
-//                 }
-//             });
-//         }
-//     }
-
-//     loadFromStorage();
-// })();
+// 5:43
